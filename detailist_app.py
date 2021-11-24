@@ -1,6 +1,7 @@
 import io
 from base64 import b64encode
 from sys import platform
+from time import sleep
 
 import keyboard as kb
 import numpy as np
@@ -24,7 +25,8 @@ class DetailistApp():
         self.diff_window_key = None
         self.about_window_key = None
         self.donate_window_key = None
-        self.canvas_border_size = None
+        self.comparison_strenght = None
+        self.comparison_strenght_key = None
 
         self.init_assets()
         self.init_gui()
@@ -42,6 +44,8 @@ class DetailistApp():
         self.graph_1_key = 'graph_1'
         self.graph_2_key = 'graph_2'
         self.graph_diff_key = 'graph_diff'
+        self.comparison_strenght = 20
+        self.comparison_strenght_key = 'comparison_strenght'
 
         screen_one_third_h = int(gui.Window.get_screen_size()[1]//3)
         self.screenshot_size = (screen_one_third_h, screen_one_third_h)
@@ -118,8 +122,8 @@ class DetailistApp():
                             gui.Text('Comparison:'),
                             gui.Combo(['Heatmap', 'Opacity'],
                                       default_value='Heatmap', tooltip='Comparison Mode', readonly=True),
-                            gui.Slider(range=(1, 100), orientation='h', disable_number_display=True,
-                                       default_value=50, tooltip='Comparison Strenght')
+                            gui.Slider(range=(1, 100), orientation='h', key=self.comparison_strenght_key, enable_events=True, disable_number_display=True,
+                                       default_value=self.comparison_strenght, tooltip='Comparison Strenght')
                         ],
                         [
                             gui.Multiline(
@@ -205,10 +209,11 @@ class DetailistApp():
         canvas.focus_set()
 
     def init_canvas(self, canvas):
-        self.canvas_border_size = 1
-        canvas.config(highlightthickness=self.canvas_border_size)
+        canvas.config(highlightthickness=1)
         canvas.configure(xscrollincrement='1')
         canvas.configure(yscrollincrement='1')
+        canvas.xview_moveto(0)
+        canvas.yview_moveto(0)
         canvas.bind('<ButtonPress-1>',
                     lambda event: self.canvas_click(event, canvas))
         canvas.bind('<B1-Motion>',
@@ -296,6 +301,10 @@ class DetailistApp():
                 self.calculate_screenshots_diff()
             elif event in ('clear_graph_1', 'clear_graph_2'):
                 self.clear_graph(event)
+            elif event == self.comparison_strenght_key:
+                self.comparison_strenght = int(
+                    values[self.comparison_strenght_key])
+                self.calculate_screenshots_diff()
 
         self.stop()
 
@@ -325,11 +334,13 @@ class DetailistApp():
 
     def center_graph(self, event):
         if event == 'center_graph_1':
-            self.graph_1.tk_canvas.xview_moveto(self.canvas_border_size)
-            self.graph_1.tk_canvas.yview_moveto(self.canvas_border_size)
+            self.graph_1.tk_canvas.xview_moveto(0)
+            self.graph_1.tk_canvas.yview_moveto(0)
         elif event == 'center_graph_2':
-            self.graph_2.tk_canvas.xview_moveto(self.canvas_border_size)
-            self.graph_2.tk_canvas.yview_moveto(self.canvas_border_size)
+            self.graph_2.tk_canvas.xview_moveto(0)
+            self.graph_2.tk_canvas.yview_moveto(0)
+
+        # TODO: Implement calculation of diff.
 
     def save_graph(self, event, path):
         if not path:
@@ -349,12 +360,13 @@ class DetailistApp():
         if self.is_screenshot_2:
             self.graph_2.erase()
             self.is_screenshot_2 = False
-            return
-
-        if self.is_screenshot_1:
+        elif self.is_screenshot_1:
             self.graph_1.erase()
             self.is_screenshot_1 = False
             return
+
+        self.tray.show_message(
+            'Detailist', 'Screenshot cleared.')
 
     def create_screenshot(self):
         if self.is_screenshot_1 and self.is_screenshot_2:
@@ -377,8 +389,9 @@ class DetailistApp():
         else:
             self.is_screenshot_1 = True
 
-        if self.is_screenshot_2:
-            self.open_window(self.diff_window_key)
+        if self.is_screenshot_2 and self.is_screenshot_1:
+            if self.visible_window != self.diff_window_key:
+                self.open_window(self.diff_window_key)
             self.calculate_screenshots_diff()
 
     def get_element_image(self, element):
@@ -389,13 +402,27 @@ class DetailistApp():
 
         return ig.grab(bbox=bbox)
 
-    def highlight_diff(self, image):
-        image_data = np.array(image.convert('RGB'))
-        red, green, blue = image_data.T
-        non_black_areas = (red != 0) | (blue != 0) | (green != 0)
-        image_data[non_black_areas.T] = (255, 0, 0)
+    def translation(self, value, input_min, input_max, output_min, output_max):
+        input_range = input_max - input_min
+        output_range = output_max - output_min
 
-        return img.fromarray(image_data)
+        normalized_value = float(value - input_min) / float(input_range)
+        return int(output_min + (normalized_value * output_range))
+
+    def calculate_diff(self, image_1, image_2):
+        image_diff = ic.difference(image_1, image_2)
+
+        image_data = np.array(image_diff.convert('HSV'))
+        image_data[:, :, 0] = 0
+        image_data[:, :, 1] = 255
+        _, _, value = image_data.T
+
+        translated_strenght = self.translation(
+            self.comparison_strenght, 1, 100, 0, 255)
+        strenght_mask = value < translated_strenght
+        image_data[strenght_mask.T] = (0, 0, 0)
+
+        return img.fromarray(image_data, 'HSV').convert('RGB')
 
     def calculate_screenshots_diff(self):
         if not self.is_screenshot_1 or not self.is_screenshot_2:
@@ -404,10 +431,10 @@ class DetailistApp():
             return
         self.is_calculation_in_progress = True
 
+        sleep(0.05)  # Wait 50 msec for window.bring_to_front.
         screenshot_1 = self.get_element_image(self.graph_1)
         screenshot_2 = self.get_element_image(self.graph_2)
-        screenshot_diff = ic.difference(screenshot_1, screenshot_2)
-        screenshot_diff = self.highlight_diff(screenshot_diff)
+        screenshot_diff = self.calculate_diff(screenshot_1, screenshot_2)
 
         screenshot_data = io.BytesIO()
         screenshot_diff.save(screenshot_data, format='PNG')
