@@ -48,6 +48,8 @@ class DetailistApp():
         self.icons_path = assets_path + 'icons/'
         with open(assets_path + 'detailist_icon.png', 'rb') as image:
             self.detailist_icon = b64encode(image.read())
+        with open(assets_path + 'detailist_small_icon.png', 'rb') as image:
+            self.detailist_small_icon = b64encode(image.read())
 
     def get_diff_window(self):
         self.graph_1_key = 'graph_1'
@@ -159,7 +161,7 @@ class DetailistApp():
         # TODO: Add info about Detailist.
         about_window = [
             [
-                gui.Image(self.detailist_icon)
+                gui.Image(self.detailist_small_icon)
             ],
             [
                 gui.Text('ver. ' + self.detailist_app_version)
