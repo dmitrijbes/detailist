@@ -1,0 +1,19 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build EXE Release",
+            "type": "shell",
+            "command": "pyinstaller --add-data 'assets;assets' --icon=assets/detailist_icon.ico --onefile --noconsole main.py ",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Build Folder Debug Release",
+            "type": "shell",
+            "command": "pyinstaller --add-data 'assets;assets' main.py"
+        }
+    ]
+}

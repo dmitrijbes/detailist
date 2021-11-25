@@ -1,7 +1,7 @@
-import io
+import sys
+from io import BytesIO
 from base64 import b64encode
-from sys import platform
-from time import sleep
+from threading import Timer
 
 import keyboard as kb
 import numpy as np
@@ -27,6 +27,8 @@ class DetailistApp():
         self.donate_window_key = None
         self.comparison_strenght = None
         self.comparison_strenght_key = None
+        self.comparison_mode = None
+        self.comparison_mode_key = None
 
         self.init_assets()
         self.init_gui()
@@ -35,9 +37,16 @@ class DetailistApp():
         self.init_hotkeys()
 
     def init_assets(self):
+        try:
+            # PyInstaller creates a temp folder and stores path in sys._MEIPASS.
+            assets_path = sys._MEIPASS  # pylint: disable=protected-access
+        except AttributeError:
+            assets_path = '.'
+        assets_path += "/assets/"
+
         self.detailist_app_version = '1.0.0'
-        self.icons_path = 'assets/icons/'
-        with open('assets/detailist_icon.png', 'rb') as image:
+        self.icons_path = assets_path + 'icons/'
+        with open(assets_path + 'detailist_icon.png', 'rb') as image:
             self.detailist_icon = b64encode(image.read())
 
     def get_diff_window(self):
@@ -46,6 +55,8 @@ class DetailistApp():
         self.graph_diff_key = 'graph_diff'
         self.comparison_strenght = 20
         self.comparison_strenght_key = 'comparison_strenght'
+        self.comparison_mode = 'Heatmap'
+        self.comparison_mode_key = 'comparison_mode'
 
         screen_one_third_h = int(gui.Window.get_screen_size()[1]//3)
         self.screenshot_size = (screen_one_third_h, screen_one_third_h)
@@ -59,6 +70,8 @@ class DetailistApp():
                                    button_color=button_color, button_type=gui.BUTTON_TYPE_SAVEAS_FILE, default_extension='png', enable_events=True, target='save_graph_1', tooltip='Save As', key='save_graph_1'),
                         gui.Button(image_filename=self.icons_path+'center_icon.png',
                                    button_color=button_color, tooltip='Center', key='center_graph_1'),
+                        gui.Button(image_filename=self.icons_path+'center_as_right_icon.png',
+                                   button_color=button_color, tooltip='Center As Right', key='center_as_right'),
                         # TODO: Implement OCR.
                         gui.Button(image_filename=self.icons_path+'ocr_icon.png',
                                    button_color=button_color, disabled=True, tooltip='OCR', key='ocr_graph_1'),
@@ -80,6 +93,8 @@ class DetailistApp():
                                    button_color=button_color, button_type=gui.BUTTON_TYPE_SAVEAS_FILE, default_extension='png', enable_events=True, target='save_graph_2', tooltip='Save As', key='save_graph_2'),
                         gui.Button(image_filename=self.icons_path+'center_icon.png',
                                    button_color=button_color, tooltip='Center', key='center_graph_2'),
+                        gui.Button(image_filename=self.icons_path+'center_as_left_icon.png',
+                                   button_color=button_color, tooltip='Center As Left', key='center_as_left'),
                         # TODO: Implement OCR.
                         gui.Button(image_filename=self.icons_path+'ocr_icon.png',
                                    button_color=button_color, disabled=True, tooltip='OCR', key='ocr_graph_2'),
@@ -120,7 +135,7 @@ class DetailistApp():
                     [
                         [
                             gui.Text('Comparison:'),
-                            gui.Combo(['Heatmap', 'Opacity'],
+                            gui.Combo(['Heatmap', 'Opacity'], enable_events=True, key=self.comparison_mode_key,
                                       default_value='Heatmap', tooltip='Comparison Mode', readonly=True),
                             gui.Slider(range=(1, 100), orientation='h', key=self.comparison_strenght_key, enable_events=True, disable_number_display=True,
                                        default_value=self.comparison_strenght, tooltip='Comparison Strenght')
@@ -176,7 +191,7 @@ class DetailistApp():
 
     def fix_taskbar_icon(self):
         # Fix taskbar icon for Windows.
-        if platform.startswith('win'):
+        if sys.platform.startswith('win'):
             import ctypes
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
                 u'detailist')  # Arbitrary string.
@@ -198,7 +213,7 @@ class DetailistApp():
                    gui.Column(diff_window, visible=False, key=self.diff_window_key)]]
 
         screen_quarter_w = int(gui.Window.get_screen_size()[0]//4)
-        self.window = gui.Window('Detailist', layout, finalize=True,
+        self.window = gui.Window('Detailist', layout, finalize=True, alpha_channel=0,
                                  enable_close_attempted_event=True, location=(screen_quarter_w, 50))
 
         # TODO: Do not show a window at startup.
@@ -212,6 +227,9 @@ class DetailistApp():
         canvas.config(highlightthickness=1)
         canvas.configure(xscrollincrement='1')
         canvas.configure(yscrollincrement='1')
+        # Max screen resolution: 6880, 2880. Aspect ratio: 16:9.
+        # scrollregion must be explicitly defined for canvas.xview() to work.
+        canvas.configure(scrollregion=(0, 0, 6880, 2880))
         canvas.xview_moveto(0)
         canvas.yview_moveto(0)
         canvas.bind('<ButtonPress-1>',
@@ -275,10 +293,6 @@ class DetailistApp():
         while True:
             event, values = self.window.read()
 
-            print('~~EVENT~~')
-            print(event)
-            print(values)
-
             if event == self.tray.key and values:
                 event = values[event]
             if event in ('Exit', gui.WIN_CLOSED):
@@ -297,6 +311,8 @@ class DetailistApp():
                 self.save_graph(event, values[event])
             elif event in ('center_graph_1', 'center_graph_2'):
                 self.center_graph(event)
+            elif event in ('center_as_right', 'center_as_left'):
+                self.center_as(event)
             elif event == 'calculate_diff':
                 self.calculate_screenshots_diff()
             elif event in ('clear_graph_1', 'clear_graph_2'):
@@ -304,6 +320,9 @@ class DetailistApp():
             elif event == self.comparison_strenght_key:
                 self.comparison_strenght = int(
                     values[self.comparison_strenght_key])
+                self.calculate_screenshots_diff()
+            elif event == self.comparison_mode_key:
+                self.comparison_mode = values[self.comparison_mode_key]
                 self.calculate_screenshots_diff()
 
         self.stop()
@@ -313,6 +332,8 @@ class DetailistApp():
         self.window.close()
 
     def open_window(self, next_window):
+        if self.window.alpha_channel == 0:
+            self.window.alpha_channel = 1
         self.window[self.visible_window].update(visible=False)
         self.window[next_window].update(visible=True)
         self.visible_window = next_window
@@ -332,15 +353,36 @@ class DetailistApp():
             self.graph_2.erase()
             self.is_screenshot_2 = False
 
+    def center_as(self, event):
+        if event == 'center_as_right':
+            graph = self.graph_1
+            graph_example = self.graph_2
+        elif event == 'center_as_left':
+            graph = self.graph_2
+            graph_example = self.graph_1
+
+        x_pos = graph_example.tk_canvas.xview()
+        y_pos = graph_example.tk_canvas.yview()
+        if not x_pos or not y_pos:
+            return
+
+        graph.tk_canvas.xview_moveto(x_pos[0])
+        graph.tk_canvas.yview_moveto(y_pos[0])
+
+        # Wait 50 msec for canvas.xview_moveto.
+        Timer(0.05, self.calculate_screenshots_diff).start()
+
     def center_graph(self, event):
         if event == 'center_graph_1':
-            self.graph_1.tk_canvas.xview_moveto(0)
-            self.graph_1.tk_canvas.yview_moveto(0)
+            graph = self.graph_1
         elif event == 'center_graph_2':
-            self.graph_2.tk_canvas.xview_moveto(0)
-            self.graph_2.tk_canvas.yview_moveto(0)
+            graph = self.graph_2
 
-        # TODO: Implement calculation of diff.
+        graph.tk_canvas.xview_moveto(0)
+        graph.tk_canvas.yview_moveto(0)
+
+        # Wait 50 msec for canvas.xview_moveto.
+        Timer(0.05, self.calculate_screenshots_diff).start()
 
     def save_graph(self, event, path):
         if not path:
@@ -357,13 +399,17 @@ class DetailistApp():
         graph_image.save(path, format='PNG')
 
     def clear_screenshot(self):
+        if not self.is_screenshot_1 and not self.is_screenshot_2:
+            self.tray.show_message(
+                'Detailist', 'No screenshots to clear.')
+            return
+
         if self.is_screenshot_2:
             self.graph_2.erase()
             self.is_screenshot_2 = False
         elif self.is_screenshot_1:
             self.graph_1.erase()
             self.is_screenshot_1 = False
-            return
 
         self.tray.show_message(
             'Detailist', 'Screenshot cleared.')
@@ -375,7 +421,7 @@ class DetailistApp():
             return
 
         screenshot = ig.grab()
-        screenshot_data = io.BytesIO()
+        screenshot_data = BytesIO()
         screenshot.save(screenshot_data, format='PNG')
 
         graph = self.graph_2 if self.is_screenshot_1 else self.graph_1
@@ -392,7 +438,9 @@ class DetailistApp():
         if self.is_screenshot_2 and self.is_screenshot_1:
             if self.visible_window != self.diff_window_key:
                 self.open_window(self.diff_window_key)
-            self.calculate_screenshots_diff()
+
+            # Wait 50 msec for window.bring_to_front.
+            Timer(0.05, self.calculate_screenshots_diff).start()
 
     def get_element_image(self, element):
         self.window.bring_to_front()
@@ -407,9 +455,15 @@ class DetailistApp():
         output_range = output_max - output_min
 
         normalized_value = float(value - input_min) / float(input_range)
-        return int(output_min + (normalized_value * output_range))
+        return output_min + (normalized_value * output_range)
 
-    def calculate_diff(self, image_1, image_2):
+    def calculate_opacity_diff(self, image_1, image_2):
+        translated_strenght = self.translation(
+            self.comparison_strenght, 1, 100, 0, 1)
+
+        return img.blend(image_1, image_2, translated_strenght)
+
+    def calculate_heatmap_diff(self, image_1, image_2):
         image_diff = ic.difference(image_1, image_2)
 
         image_data = np.array(image_diff.convert('HSV'))
@@ -419,10 +473,18 @@ class DetailistApp():
 
         translated_strenght = self.translation(
             self.comparison_strenght, 1, 100, 0, 255)
-        strenght_mask = value < translated_strenght
+        strenght_mask = value < int(translated_strenght)
         image_data[strenght_mask.T] = (0, 0, 0)
 
         return img.fromarray(image_data, 'HSV').convert('RGB')
+
+    def calculate_diff(self, image_1, image_2):
+        if self.comparison_mode == 'Opacity':
+            image_diff = self.calculate_opacity_diff(image_1, image_2)
+        else:
+            image_diff = self.calculate_heatmap_diff(image_1, image_2)
+
+        return image_diff
 
     def calculate_screenshots_diff(self):
         if not self.is_screenshot_1 or not self.is_screenshot_2:
@@ -431,12 +493,11 @@ class DetailistApp():
             return
         self.is_calculation_in_progress = True
 
-        sleep(0.05)  # Wait 50 msec for window.bring_to_front.
         screenshot_1 = self.get_element_image(self.graph_1)
         screenshot_2 = self.get_element_image(self.graph_2)
         screenshot_diff = self.calculate_diff(screenshot_1, screenshot_2)
 
-        screenshot_data = io.BytesIO()
+        screenshot_data = BytesIO()
         screenshot_diff.save(screenshot_data, format='PNG')
 
         self.graph_diff.erase()
