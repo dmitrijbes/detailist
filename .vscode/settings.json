@@ -1,0 +1,4 @@
+{
+    // Jekyll requires Front Matter in SCSS, which breaks validation.
+    "scss.validate": false
+}

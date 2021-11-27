@@ -160,6 +160,7 @@ class DetailistApp():
     def get_about_window(self):
         # TODO: Add info about Detailist.
         # TODO: Add credits.
+        # TODO: Add license.
         about_window = [
             [
                 gui.Image(self.detailist_small_icon)
