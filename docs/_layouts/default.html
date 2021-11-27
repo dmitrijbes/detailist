@@ -2,7 +2,11 @@
 <html>
 	<head>
 		<title>Detailist - Screenshot Comparison Tool</title>
-		<link rel="icon" type="image/png" href="images/detailist_favicon.png" />
+		<link
+			rel="icon"
+			type="image/png"
+			href="/assets/img/detailist_favicon.png"
+		/>
 
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -12,7 +16,7 @@
 		/>
 		<meta
 			name="description"
-			content="Detailist is a simple tool that allows to take screenshots, compare images using heatmap of differences and extract images text (OCR)."
+			content="Detailist is a simple tool that allows to take screenshots, compare screenshots using heatmap of differences and extract screenshots text (OCR)."
 		/>
 		<meta name="author" content="Dima Beskrestnov" />
 
@@ -28,9 +32,15 @@
 		/>
 		<meta
 			property="og:image"
-			content="https://detailist.org/images/detailist_og.png"
+			content="https://detailist.org/assets/img/detailist_og.png"
 		/>
 
+		<link
+			rel="stylesheet"
+			href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision }}"
+		/>
+
+		<script defer src="/assets/js/scale.fix.js"></script>
 		<script
 			async
 			src="https://www.googletagmanager.com/gtag/js?id=G-CBXXS65F8D"
@@ -44,11 +54,6 @@
 
 			gtag("config", "G-CBXXS65F8D");
 		</script>
-
-		<link
-			rel="stylesheet"
-			href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision }}"
-		/>
 	</head>
 	<body>
 		<div class="wrapper">
@@ -56,18 +61,18 @@
 				<h1>
 					<a href="/">Detailist</a>
 				</h1>
-
-				<img src="images/detailist_icon.png" alt="Detailist Logo" />
-
+				<img
+					src="/assets/img/detailist_icon.png"
+					alt="Detailist Logo"
+				/>
 				<p>{{ site.github.project_tagline }}</p>
-
-				<p class="view">
-					<a href="{{ site.github.repository_url }}"
-						>View the Project on GitHub
-						<small>{{ site.github.repository_nwo }}</small></a
-					>
-				</p>
-
+				<ul class="downloads">
+					<li>
+						<a href="{{ site.github.releases_url }}"
+							><strong>Download</strong></a
+						>
+					</li>
+				</ul>
 				<ul class="downloads">
 					<li>
 						<a href="{{ site.github.zip_url }}"
@@ -86,16 +91,23 @@
 					</li>
 				</ul>
 			</header>
+
 			<section>{{ content }}</section>
+
 			<footer>
 				<p>
-					This project is maintained by
+					License:
+					<a href="{{ site.github.license.name }}"
+						>{{ site.github.license.url }}</a
+					>
+				</p>
+				<p>
+					Maintained by
 					<a href="{{ site.github.owner_url }}"
 						>{{ site.github.owner_name }}</a
 					>
 				</p>
 			</footer>
 		</div>
-		<script src="/assets/js/scale.fix.js"></script>
 	</body>
 </html>

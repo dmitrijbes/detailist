@@ -159,6 +159,7 @@ class DetailistApp():
 
     def get_about_window(self):
         # TODO: Add info about Detailist.
+        # TODO: Add credits.
         about_window = [
             [
                 gui.Image(self.detailist_small_icon)
@@ -169,7 +170,7 @@ class DetailistApp():
             [
                 gui.Text(
                     text='Detailist is a simple tool that allows to take screenshots,'
-                    ' compare images using heatmap of differences and extract images text (OCR).',
+                    ' compare screenshots using heatmap of differences and extract screenshots text (OCR).',
                     size=self.text_size)
             ]]
 
@@ -199,7 +200,7 @@ class DetailistApp():
                 u'detailist')  # Arbitrary string.
 
     def init_gui(self):
-        gui.theme('Material1')
+        gui.theme('LightGrey1')
         gui.set_global_icon(self.detailist_icon)
         self.fix_taskbar_icon()
 
