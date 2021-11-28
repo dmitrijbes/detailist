@@ -24,7 +24,6 @@ class DetailistApp():
         self.screenshot_size = None
         self.diff_window_key = None
         self.about_window_key = None
-        self.donate_window_key = None
         self.comparison_strenght = None
         self.comparison_strenght_key = None
         self.comparison_mode = None
@@ -178,21 +177,6 @@ class DetailistApp():
         self.about_window_key = 'about_window'
         return about_window
 
-    def get_donate_window(self):
-        # TODO: Add donation info.
-        donate_window = [
-            [
-                gui.Image(self.icons_path+'donate_icon.png')
-            ],
-            [
-                gui.Text(
-                    'Ipsum exercitation labore adipisicing laboris eu occaecat tempor qui nostrud cupidatat est.', size=self.text_size)
-            ]
-        ]
-
-        self.donate_window_key = 'donate_window'
-        return donate_window
-
     def fix_taskbar_icon(self):
         # Fix taskbar icon for Windows.
         if sys.platform.startswith('win'):
@@ -207,13 +191,10 @@ class DetailistApp():
 
         self.text_size = (60, 3)
         about_window = self.get_about_window()
-        donate_window = self.get_donate_window()
         diff_window = self.get_diff_window()
 
         self.visible_window = self.about_window_key
         layout = [[gui.Column(about_window, element_justification='center', visible=False, key=self.about_window_key),
-                   gui.Column(donate_window, element_justification='center',
-                              visible=False, key=self.donate_window_key),
                    gui.Column(diff_window, visible=False, key=self.diff_window_key)]]
 
         screen_quarter_w = int(gui.Window.get_screen_size()[0]//4)
@@ -284,7 +265,7 @@ class DetailistApp():
 
     def init_tray(self):
         # psgtray throws exception without first empty element.
-        tray_menu = ['', ['Compare Screenshots', 'Donate', 'About', 'Exit']]
+        tray_menu = ['', ['Compare Screenshots', 'About', 'Exit']]
         # TODO: Change icon.
         self.tray = SystemTray(tray_menu, single_click_events=False,
                                window=self.window, tooltip='Detailist', icon=self.detailist_icon)
@@ -304,8 +285,6 @@ class DetailistApp():
 
             if event in ('Compare Screenshots', gui.EVENT_SYSTEM_TRAY_ICON_DOUBLE_CLICKED):
                 self.open_window(self.diff_window_key)
-            elif event == 'Donate':
-                self.open_window(self.donate_window_key)
             elif event == 'About':
                 self.open_window(self.about_window_key)
             elif event == gui.WIN_CLOSE_ATTEMPTED_EVENT:
