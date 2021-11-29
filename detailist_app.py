@@ -2,6 +2,7 @@ import sys
 from io import BytesIO
 from base64 import b64encode
 from threading import Timer
+from difflib import SequenceMatcher
 
 import keyboard as kb
 import numpy as np
@@ -18,6 +19,7 @@ class DetailistApp():
         self.is_screenshot_2 = None
         self.visible_window = None
         self.is_calculation_in_progress = False
+        self.is_auto_center_in_progress = False
         self.graph_1_key = None
         self.graph_2_key = None
         self.graph_diff_key = None
@@ -28,6 +30,10 @@ class DetailistApp():
         self.comparison_strenght_key = None
         self.comparison_mode = None
         self.comparison_mode_key = None
+        self.max_width = None
+        self.max_heigh = None
+        self.screenshot_width_key = None
+        self.screenshot_heigh_key = None
 
         self.init_assets()
         self.init_gui()
@@ -58,6 +64,8 @@ class DetailistApp():
         self.comparison_strenght_key = 'comparison_strenght'
         self.comparison_mode = 'Heatmap'
         self.comparison_mode_key = 'comparison_mode'
+        self.screenshot_width_key = 'screenshot_width'
+        self.screenshot_heigh_key = 'screenshot_heigh'
 
         screen_one_third_h = int(gui.Window.get_screen_size()[1]//3)
         self.screenshot_size = (screen_one_third_h, screen_one_third_h)
@@ -82,8 +90,8 @@ class DetailistApp():
                     [
                         gui.Graph(
                             canvas_size=self.screenshot_size,
-                            graph_bottom_left=(0, 400),
-                            graph_top_right=(400, 0),
+                            graph_bottom_left=(0, self.screenshot_size[1]),
+                            graph_top_right=(self.screenshot_size[0], 0),
                             key=self.graph_1_key
                         )
                     ]
@@ -105,8 +113,8 @@ class DetailistApp():
                     [
                         gui.Graph(
                             canvas_size=self.screenshot_size,
-                            graph_bottom_left=(0, 400),
-                            graph_top_right=(400, 0),
+                            graph_bottom_left=(0, self.screenshot_size[1]),
+                            graph_top_right=(self.screenshot_size[0], 0),
                             key=self.graph_2_key,
                         )
                     ]
@@ -119,15 +127,14 @@ class DetailistApp():
                                    enable_events=True, target='save_graph_diff', button_color=button_color, tooltip='Save As', key='save_graph_diff'),
                         gui.Button(image_filename=self.icons_path+'calculate_diff_icon.png',
                                    button_color=button_color, tooltip='Calculate Difference', key='calculate_diff'),
-                        # TODO: Implement Auto Centering.
-                        gui.Button(image_filename=self.icons_path+'auto_center_icon.png', disabled=True,
+                        gui.Button(image_filename=self.icons_path+'auto_center_icon.png',
                                    button_color=button_color, tooltip='Auto Center', key='auto_center'),
                     ],
                     [
                         gui.Graph(
                             canvas_size=self.screenshot_size,
-                            graph_bottom_left=(0, 400),
-                            graph_top_right=(400, 0),
+                            graph_bottom_left=(0, self.screenshot_size[1]),
+                            graph_top_right=(self.screenshot_size[0], 0),
                             key=self.graph_diff_key
                         )
                     ]
@@ -135,17 +142,26 @@ class DetailistApp():
                 gui.Column(
                     [
                         [
+                            gui.Text('Screenshot:'),
+                            gui.Input(default_text=self.screenshot_size[0], size=(
+                                6, 1), key=self.screenshot_width_key, tooltip='Screenshot Width'),
+                            gui.Input(default_text=self.screenshot_size[1], size=(
+                                6, 1), key=self.screenshot_heigh_key, tooltip='Screenshot Heigh'),
+                            gui.Button(button_text='Resize',
+                                       tooltip='Resize Screenshot')
+                        ],
+                        [
                             gui.Text('Comparison:'),
-                            gui.Combo(['Heatmap', 'Opacity'], enable_events=True, key=self.comparison_mode_key,
+                            gui.Combo(['Heatmap', 'Opacity', 'Simple Diff'], size=(8, 6), enable_events=True, key=self.comparison_mode_key,
                                       default_value='Heatmap', tooltip='Comparison Mode', readonly=True),
-                            gui.Slider(range=(1, 100), orientation='h', key=self.comparison_strenght_key, enable_events=True, disable_number_display=True,
+                            gui.Slider(size=(20, 20), range=(1, 100), orientation='h', key=self.comparison_strenght_key, enable_events=True, disable_number_display=True,
                                        default_value=self.comparison_strenght, tooltip='Comparison Strenght')
                         ],
                         [
                             gui.Multiline(
                                 disabled=True,
                                 size=(int(screen_one_third_h//7.5), 12),
-                                default_text='Drag an image using mouse.\nClick on image and move it using arrow keys.\nHold Ctrl while using arrow keys to increase movement speed.')
+                                default_text='Drag an image using mouse.\nClick on image and move it using arrow keys.\nHold Ctrl while using arrow keys to increase movement speed.\nBored trying to precisely match screenshot positions? Position screenshots approximately and click "Auto Center" button.')
                         ]
                     ],
                     vertical_alignment='bottom'
@@ -214,7 +230,9 @@ class DetailistApp():
         canvas.configure(yscrollincrement='1')
         # Max screen resolution: 6880, 2880. Aspect ratio: 16:9.
         # scrollregion must be explicitly defined for canvas.xview() to work.
-        canvas.configure(scrollregion=(0, 0, 6880, 2880))
+        self.max_width = 6880
+        self.max_heigh = 2880
+        canvas.configure(scrollregion=(0, 0, self.max_width, self.max_heigh))
         canvas.xview_moveto(0)
         canvas.yview_moveto(0)
         canvas.bind('<ButtonPress-1>',
@@ -300,6 +318,8 @@ class DetailistApp():
                 self.calculate_screenshots_diff()
             elif event in ('clear_graph_1', 'clear_graph_2'):
                 self.clear_graph(event)
+            elif event == 'auto_center':
+                self.auto_center()
             elif event == self.comparison_strenght_key:
                 self.comparison_strenght = int(
                     values[self.comparison_strenght_key])
@@ -307,8 +327,39 @@ class DetailistApp():
             elif event == self.comparison_mode_key:
                 self.comparison_mode = values[self.comparison_mode_key]
                 self.calculate_screenshots_diff()
+            elif event == 'Resize':
+                self.resize_screenshots(
+                    values[self.screenshot_width_key], values[self.screenshot_heigh_key])
 
         self.stop()
+
+    def resize_screenshots(self, screenshot_width_input, screenshot_heigh_input):
+        if not screenshot_width_input or not screenshot_heigh_input:
+            self.tray.show_message(
+                'Detailist', 'Screenshot Width or Heigh is empty!')
+            return
+
+        try:
+            screenshot_width = int(screenshot_width_input)
+            screenshot_heigh = int(screenshot_heigh_input)
+
+            if screenshot_width <= 0 or screenshot_heigh <= 0:
+                self.tray.show_message(
+                    'Detailist', 'Screenshot size invalid value!')
+                return
+
+            self.graph_1.set_size((screenshot_width, screenshot_heigh))
+            self.graph_1.change_coordinates(
+                (0, screenshot_heigh), (screenshot_width, 0))
+            self.graph_2.set_size((screenshot_width, screenshot_heigh))
+            self.graph_2.change_coordinates(
+                (0, screenshot_heigh), (screenshot_width, 0))
+            self.graph_diff.set_size((screenshot_width, screenshot_heigh))
+            self.graph_diff.change_coordinates(
+                (0, screenshot_heigh), (screenshot_width, 0))
+        except ValueError:
+            self.tray.show_message(
+                'Detailist', 'Screenshot size must be a number!')
 
     def stop(self):
         self.tray.close()
@@ -322,6 +373,59 @@ class DetailistApp():
         self.visible_window = next_window
         self.window.un_hide()
         self.window.bring_to_front()
+
+    def get_pos_diff(self, sequence_1, sequence_2):
+        sequence_matcher = SequenceMatcher(
+            None, sequence_1, sequence_2, autojunk=False)
+        match = sequence_matcher.find_longest_match(
+            0, len(sequence_1), 0, len(sequence_2))
+        return match.a - match.b
+
+    def get_channel_index(self, img_data):
+        channel_data = img_data.sum(axis=0)[:, 0]
+        if channel_data.sum() != 0:
+            return 0
+
+        channel_data = img_data.sum(axis=0)[:, 2]
+        if channel_data.sum() != 0:
+            return 2
+
+        return 1
+
+    def auto_center(self):
+        if not self.is_screenshot_1 or not self.is_screenshot_2:
+            return
+        if self.is_auto_center_in_progress:
+            return
+        self.is_auto_center_in_progress = True
+
+        screenshot_1 = self.get_element_image(self.graph_1)
+        screenshot_2 = self.get_element_image(self.graph_2)
+        img_data_1 = np.array(screenshot_1.convert('HSV'))
+        img_data_2 = np.array(screenshot_2.convert('HSV'))
+
+        channel_index = self.get_channel_index(img_data_1)
+        x_channel_1 = img_data_1.sum(axis=0)[:, channel_index]
+        x_channel_2 = img_data_2.sum(axis=0)[:, channel_index]
+        y_channel_1 = img_data_1.sum(axis=1)[:, channel_index]
+        y_channel_2 = img_data_2.sum(axis=1)[:, channel_index]
+
+        pos_diff_x = self.get_pos_diff(x_channel_1, x_channel_2)
+        pos_diff_y = self.get_pos_diff(y_channel_1, y_channel_2)
+
+        x_pos = self.graph_2.tk_canvas.xview()
+        y_pos = self.graph_2.tk_canvas.yview()
+        if not x_pos or not y_pos:
+            return
+
+        self.graph_2.tk_canvas.xview_moveto(
+            x_pos[0] - pos_diff_x / self.max_width)
+        self.graph_2.tk_canvas.yview_moveto(
+            y_pos[0] - pos_diff_y / self.max_heigh)
+        self.is_auto_center_in_progress = False
+
+        # Wait 50 msec for canvas.xview_moveto.
+        Timer(0.05, self.calculate_screenshots_diff).start()
 
     def clear_graph(self, event):
         is_clear = gui.popup_yes_no(
@@ -464,10 +568,15 @@ class DetailistApp():
     def calculate_diff(self, image_1, image_2):
         if self.comparison_mode == 'Opacity':
             image_diff = self.calculate_opacity_diff(image_1, image_2)
+        elif self.comparison_mode == 'Simple Diff':
+            image_diff = self.calculate_simple_diff(image_1, image_2)
         else:
             image_diff = self.calculate_heatmap_diff(image_1, image_2)
 
         return image_diff
+
+    def calculate_simple_diff(self, image_1, image_2):
+        return ic.difference(image_1, image_2)
 
     def calculate_screenshots_diff(self):
         if not self.is_screenshot_1 or not self.is_screenshot_2:
