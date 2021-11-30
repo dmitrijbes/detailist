@@ -3,6 +3,8 @@ from io import BytesIO
 from base64 import b64encode
 from threading import Timer
 from difflib import SequenceMatcher
+from os import remove, scandir, path, makedirs
+from subprocess import Popen
 
 import keyboard as kb
 import numpy as np
@@ -34,6 +36,7 @@ class DetailistApp():
         self.max_heigh = None
         self.screenshot_width_key = None
         self.screenshot_heigh_key = None
+        self.text_window_key = None
 
         self.init_assets()
         self.init_gui()
@@ -44,10 +47,15 @@ class DetailistApp():
     def init_assets(self):
         try:
             # PyInstaller creates a temp folder and stores path in sys._MEIPASS.
-            assets_path = sys._MEIPASS  # pylint: disable=protected-access
+            detailist_path = sys._MEIPASS  # pylint: disable=protected-access
         except AttributeError:
-            assets_path = '.'
-        assets_path += "/assets/"
+            detailist_path = '.'
+        assets_path = detailist_path + "/assets/"
+        self.ocr_path = detailist_path + "/tesseract/"
+
+        self.tmp_path = detailist_path + "/tmp/"
+        if not path.exists(self.tmp_path):
+            makedirs(self.tmp_path)
 
         self.detailist_app_version = '1.0.0'
         self.icons_path = assets_path + 'icons/'
@@ -66,6 +74,7 @@ class DetailistApp():
         self.comparison_mode_key = 'comparison_mode'
         self.screenshot_width_key = 'screenshot_width'
         self.screenshot_heigh_key = 'screenshot_heigh'
+        self.text_window_key = 'text_window'
 
         screen_one_third_h = int(gui.Window.get_screen_size()[1]//3)
         self.screenshot_size = (screen_one_third_h, screen_one_third_h)
@@ -81,9 +90,8 @@ class DetailistApp():
                                    button_color=button_color, tooltip='Center', key='center_graph_1'),
                         gui.Button(image_filename=self.icons_path+'center_as_right_icon.png',
                                    button_color=button_color, tooltip='Center As Right', key='center_as_right'),
-                        # TODO: Implement OCR.
                         gui.Button(image_filename=self.icons_path+'ocr_icon.png',
-                                   button_color=button_color, disabled=True, tooltip='OCR', key='ocr_graph_1'),
+                                   button_color=button_color, tooltip='OCR', key='ocr_graph_1'),
                         gui.Button(image_filename=self.icons_path+'clear_icon.png',
                                    button_color=button_color, tooltip='Clear', key='clear_graph_1'),
                     ],
@@ -104,9 +112,8 @@ class DetailistApp():
                                    button_color=button_color, tooltip='Center', key='center_graph_2'),
                         gui.Button(image_filename=self.icons_path+'center_as_left_icon.png',
                                    button_color=button_color, tooltip='Center As Left', key='center_as_left'),
-                        # TODO: Implement OCR.
                         gui.Button(image_filename=self.icons_path+'ocr_icon.png',
-                                   button_color=button_color, disabled=True, tooltip='OCR', key='ocr_graph_2'),
+                                   button_color=button_color, tooltip='OCR', key='ocr_graph_2'),
                         gui.Button(image_filename=self.icons_path+'clear_icon.png',
                                    button_color=button_color, tooltip='Clear', key='clear_graph_2'),
                     ],
@@ -161,7 +168,8 @@ class DetailistApp():
                             gui.Multiline(
                                 disabled=True,
                                 size=(int(screen_one_third_h//7.5), 12),
-                                default_text='Drag an image using mouse.\nClick on image and move it using arrow keys.\nHold Ctrl while using arrow keys to increase movement speed.\nBored trying to precisely match screenshot positions? Position screenshots approximately and click "Auto Center" button.')
+                                key='text_window',
+                                default_text='Drag an image using mouse.\nClick on image and move it using arrow keys.\nHold Ctrl while using arrow keys to increase movement speed.\nBored trying to precisely match screenshot positions? Position screenshots approximately and click "Auto Center" button.\nIncrease screenshot text size for better OCR.')
                         ]
                     ],
                     vertical_alignment='bottom'
@@ -217,7 +225,6 @@ class DetailistApp():
         self.window = gui.Window('Detailist', layout, finalize=True, alpha_channel=0,
                                  enable_close_attempted_event=True, location=(screen_quarter_w, 50))
 
-        # TODO: Do not show a window at startup.
         self.window.hide()
 
     def canvas_click(self, event, canvas):
@@ -284,7 +291,6 @@ class DetailistApp():
     def init_tray(self):
         # psgtray throws exception without first empty element.
         tray_menu = ['', ['Compare Screenshots', 'About', 'Exit']]
-        # TODO: Change icon.
         self.tray = SystemTray(tray_menu, single_click_events=False,
                                window=self.window, tooltip='Detailist', icon=self.detailist_icon)
 
@@ -318,6 +324,8 @@ class DetailistApp():
                 self.calculate_screenshots_diff()
             elif event in ('clear_graph_1', 'clear_graph_2'):
                 self.clear_graph(event)
+            elif event in ('ocr_graph_1', 'ocr_graph_2'):
+                self.ocr_graph(event)
             elif event == 'auto_center':
                 self.auto_center()
             elif event == self.comparison_strenght_key:
@@ -332,6 +340,37 @@ class DetailistApp():
                     values[self.screenshot_width_key], values[self.screenshot_heigh_key])
 
         self.stop()
+
+    def get_image_text(self, img_path):
+        ocr_tool_path = self.ocr_path + 'tesseract.exe'
+        tmp_text_path = self.tmp_path + 'tmp'
+        create_no_window = 0x08000000
+        ocr_proc = Popen(
+            [ocr_tool_path, img_path, tmp_text_path], creationflags=create_no_window)
+        return_code = ocr_proc.wait()
+        if return_code != 0:
+            return 'OCR error occurred!'
+
+        image_text = ''
+        with open(tmp_text_path + '.txt', encoding="utf8") as image_text_file:
+            image_text = image_text_file.read()
+
+        return image_text
+
+    def ocr_graph(self, event):
+        if event == 'ocr_graph_1':
+            graph = self.graph_1
+        elif event == 'ocr_graph_2':
+            graph = self.graph_2
+
+        graph_image = self.get_element_image(graph)
+        tmp_img_path = self.tmp_path + 'tmp.png'
+        graph_image.save(tmp_img_path, format='PNG')
+
+        image_text = self.get_image_text(tmp_img_path)
+        self.window[self.text_window_key].update(image_text)
+
+        self.clean_tmp()
 
     def resize_screenshots(self, screenshot_width_input, screenshot_heigh_input):
         if not screenshot_width_input or not screenshot_heigh_input:
@@ -361,7 +400,12 @@ class DetailistApp():
             self.tray.show_message(
                 'Detailist', 'Screenshot size must be a number!')
 
+    def clean_tmp(self):
+        for file in scandir(self.tmp_path):
+            remove(file.path)
+
     def stop(self):
+        self.clean_tmp()
         self.tray.close()
         self.window.close()
 
@@ -471,8 +515,8 @@ class DetailistApp():
         # Wait 50 msec for canvas.xview_moveto.
         Timer(0.05, self.calculate_screenshots_diff).start()
 
-    def save_graph(self, event, path):
-        if not path:
+    def save_graph(self, event, save_path):
+        if not save_path:
             return
 
         if event == 'save_graph_1':
@@ -483,7 +527,7 @@ class DetailistApp():
             graph = self.graph_diff
 
         graph_image = self.get_element_image(graph)
-        graph_image.save(path, format='PNG')
+        graph_image.save(save_path, format='PNG')
 
     def clear_screenshot(self):
         if not self.is_screenshot_1 and not self.is_screenshot_2:
