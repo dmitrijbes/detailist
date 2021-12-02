@@ -177,7 +177,7 @@ class DetailistApp():
                             gui.Text('Comparison:'),
                             gui.Combo(['Heatmap', 'Opacity', 'Simple Diff'], size=(8, 6), enable_events=True, key=self.comparison_mode_key,
                                       default_value='Heatmap', tooltip='Comparison Mode', readonly=True),
-                            gui.Slider(size=(20, 20), range=(1, 100), orientation='h', key=self.comparison_strenght_key, enable_events=True, disable_number_display=True,
+                            gui.Slider(size=(int(self.screen_one_third_h//18), 20), range=(1, 100), orientation='h', key=self.comparison_strenght_key, enable_events=True, disable_number_display=True,
                                        default_value=self.comparison_strenght, tooltip='Comparison Strenght')
                         ],
                         [
