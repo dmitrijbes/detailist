@@ -4,7 +4,7 @@
         {
             "label": "Build EXE Release",
             "type": "shell",
-            "command": "pyinstaller --add-data 'assets;assets' --add-data 'tesseract;tesseract' --icon=assets/detailist_icon.ico --onefile --noconsole main.py",
+            "command": "pyinstaller --add-data 'assets;assets' --add-data 'tesseract;tesseract' --add-data 'LICENSE.txt;LICENSE.txt' --icon=assets/detailist_icon.ico --onefile --noconsole main.py",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -13,7 +13,7 @@
         {
             "label": "Build Folder Debug Release",
             "type": "shell",
-            "command": "pyinstaller --add-data 'assets;assets' --add-data 'tesseract;tesseract' main.py"
+            "command": "pyinstaller --add-data 'assets;assets' --add-data 'tesseract;tesseract' --add-data 'LICENSE.txt;LICENSE.txt' main.py"
         }
     ]
 }

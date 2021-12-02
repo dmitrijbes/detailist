@@ -20,3 +20,8 @@ python main.py
 ```
 ## etc.
 Unfortunately GitHub named folder 'docs' contains GitHub Pages website.
+
+# License
+Apache License 2.0  
+
+In short, your are free to use (including commercial), copy, modify, sing, distribute.

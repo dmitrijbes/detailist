@@ -1,3 +1,17 @@
+# Copyright © 2021 Dima Beskrestnov
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import sys
 from io import BytesIO
 from base64 import b64encode
@@ -50,7 +64,7 @@ class DetailistApp():
             detailist_path = sys._MEIPASS  # pylint: disable=protected-access
         except AttributeError:
             detailist_path = '.'
-        assets_path = detailist_path + "/assets/"
+        self.assets_path = detailist_path + "/assets/"
         self.ocr_path = detailist_path + "/tesseract/"
 
         self.tmp_path = detailist_path + "/tmp/"
@@ -58,10 +72,10 @@ class DetailistApp():
             makedirs(self.tmp_path)
 
         self.detailist_app_version = '1.0.0'
-        self.icons_path = assets_path + 'icons/'
-        with open(assets_path + 'detailist_icon.png', 'rb') as image:
+        self.icons_path = self.assets_path + 'icons/'
+        with open(self.assets_path + 'detailist_icon.png', 'rb') as image:
             self.detailist_icon = b64encode(image.read())
-        with open(assets_path + 'detailist_small_icon.png', 'rb') as image:
+        with open(self.assets_path + 'detailist_small_icon.png', 'rb') as image:
             self.detailist_small_icon = b64encode(image.read())
 
     def get_diff_window(self):
@@ -181,22 +195,51 @@ class DetailistApp():
         return diff_window
 
     def get_about_window(self):
-        # TODO: Add info about Detailist.
-        # TODO: Add credits.
-        # TODO: Add license.
+        with open(self.assets_path + 'LICENSES.txt', encoding="utf8") as licenses_file:
+            licenses_text = licenses_file.read()
+
+        # Default font: ("Helvetica", 11)
+        title_font = ("Helvetica", 14)
+        small_font = ("Helvetica", 9)
+        text_width = 60
+
         about_window = [
             [
                 gui.Image(self.detailist_small_icon)
             ],
             [
-                gui.Text('ver. ' + self.detailist_app_version)
+                gui.Text('Detailist', font=title_font, p=(0, 0))
+            ],
+            [
+                gui.Text('ver. ' + self.detailist_app_version,
+                         font=small_font, p=(0, 0))
             ],
             [
                 gui.Text(
                     text='Detailist is a simple tool that allows to take screenshots,'
                     ' compare screenshots using heatmap of differences and extract screenshots text (OCR).',
-                    size=self.text_size)
-            ]]
+                    size=(text_width, 2))
+            ],
+            [
+                gui.Text('Copyright © 2021 Dima Beskrestnov\nLicensed under the Apache License 2.0',
+                         justification='c')
+            ],
+            [
+                gui.HorizontalSeparator()
+            ],
+            [
+                gui.Text(
+                    text='Detailist is a small man standing on the shoulders of giants.\nIt was built using: Python, PySimpleGUI, PyInstaller, Pillow, NumPy, Tesseract, psgtray and keyboard libraries.'
+                    '\nLicenses for libraries used are reproduced below:',
+                    size=(text_width, 4))
+            ],
+            [
+                gui.Multiline(
+                    disabled=True,
+                    size=(text_width, 8),
+                    default_text=licenses_text)
+            ],
+        ]
 
         self.about_window_key = 'about_window'
         return about_window
@@ -213,7 +256,6 @@ class DetailistApp():
         gui.set_global_icon(self.detailist_icon)
         self.fix_taskbar_icon()
 
-        self.text_size = (60, 3)
         about_window = self.get_about_window()
         diff_window = self.get_diff_window()
 
