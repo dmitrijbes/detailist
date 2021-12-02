@@ -18,7 +18,7 @@ pip install keyboard
 ```
 python main.py
 ```
-## etc.
+### etc.
 Unfortunately GitHub named folder 'docs' contains GitHub Pages website.
 
 ## Contribution
