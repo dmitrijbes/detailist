@@ -20,9 +20,9 @@ from difflib import SequenceMatcher
 from os import remove, scandir, path, makedirs
 from subprocess import Popen
 
-import keyboard as kb
 import numpy as np
 import PySimpleGUI as gui
+from keyboard import add_hotkey
 from psgtray import SystemTray
 from PIL import Image as img
 from PIL import ImageGrab as ig
@@ -31,26 +31,40 @@ from PIL import ImageChops as ic
 
 class DetailistApp():
     def __init__(self):
-        self.is_screenshot_1 = None
-        self.is_screenshot_2 = None
-        self.visible_window = None
-        self.is_calculation_in_progress = False
-        self.is_auto_center_in_progress = False
-        self.graph_1_key = None
-        self.graph_2_key = None
-        self.graph_diff_key = None
-        self.screenshot_size = None
-        self.diff_window_key = None
-        self.about_window_key = None
-        self.comparison_strenght = None
-        self.comparison_strenght_key = None
-        self.comparison_mode = None
-        self.comparison_mode_key = None
-        self.max_width = None
-        self.max_heigh = None
-        self.screenshot_width_key = None
-        self.screenshot_heigh_key = None
-        self.text_window_key = None
+        self.detailist_app_version = '1.0.0'
+
+        self.about_window_key = 'about_window'
+        self.diff_window_key = 'diff_window'
+        self.graph_1_key = 'graph_1'
+        self.graph_2_key = 'graph_2'
+        self.graph_diff_key = 'graph_diff'
+        self.comparison_mode_key = 'comparison_mode'
+        self.comparison_strenght_key = 'comparison_strenght'
+        self.screenshot_width_key = 'screenshot_width'
+        self.screenshot_heigh_key = 'screenshot_heigh'
+        self.text_block_key = 'text_block'
+
+        self.is_screenshot_1 = False
+        self.is_screenshot_2 = False
+        self.is_diff_in_progress = False
+        self.is_center_in_progress = False
+
+        self.visible_window = self.about_window_key
+        self.screen_quarter_w = int(gui.Window.get_screen_size()[0]//4)
+        self.screen_one_third_h = int(gui.Window.get_screen_size()[1]//3)
+        self.screenshot_size = (self.screen_one_third_h,
+                                self.screen_one_third_h)
+        self.comparison_strenght = 20
+        self.comparison_mode = 'Heatmap'
+        # Max screen resolution: 6880, 2880. Aspect ratio: 16:9.
+        # scrollregion must be explicitly defined for canvas.xview() to work.
+        self.max_width = 6880
+        self.max_heigh = 2880
+
+        # Default font: ("Helvetica", 11)
+        self.title_font = ("Helvetica", 14)
+        self.small_font = ("Helvetica", 9)
+        self.text_width = 60
 
         self.init_assets()
         self.init_gui()
@@ -66,12 +80,13 @@ class DetailistApp():
             detailist_path = '.'
         self.assets_path = detailist_path + "/assets/"
         self.ocr_path = detailist_path + "/tesseract/"
-
         self.tmp_path = detailist_path + "/tmp/"
         if not path.exists(self.tmp_path):
             makedirs(self.tmp_path)
 
-        self.detailist_app_version = '1.0.0'
+        with open(self.assets_path + 'LICENSES.txt', encoding="utf8") as licenses_file:
+            self.licenses_text = licenses_file.read()
+
         self.icons_path = self.assets_path + 'icons/'
         with open(self.assets_path + 'detailist_icon.png', 'rb') as image:
             self.detailist_icon = b64encode(image.read())
@@ -79,19 +94,6 @@ class DetailistApp():
             self.detailist_small_icon = b64encode(image.read())
 
     def get_diff_window(self):
-        self.graph_1_key = 'graph_1'
-        self.graph_2_key = 'graph_2'
-        self.graph_diff_key = 'graph_diff'
-        self.comparison_strenght = 20
-        self.comparison_strenght_key = 'comparison_strenght'
-        self.comparison_mode = 'Heatmap'
-        self.comparison_mode_key = 'comparison_mode'
-        self.screenshot_width_key = 'screenshot_width'
-        self.screenshot_heigh_key = 'screenshot_heigh'
-        self.text_window_key = 'text_window'
-
-        screen_one_third_h = int(gui.Window.get_screen_size()[1]//3)
-        self.screenshot_size = (screen_one_third_h, screen_one_third_h)
         button_color = (gui.theme_background_color(),
                         gui.theme_background_color())
         diff_window = [
@@ -181,8 +183,8 @@ class DetailistApp():
                         [
                             gui.Multiline(
                                 disabled=True,
-                                size=(int(screen_one_third_h//7.5), 12),
-                                key='text_window',
+                                size=(int(self.screen_one_third_h//7.5), 12),
+                                key=self.text_block_key,
                                 default_text='Drag an image using mouse.\nClick on image and move it using arrow keys.\nHold Ctrl while using arrow keys to increase movement speed.\nBored trying to precisely match screenshot positions? Position screenshots approximately and click "Auto Center" button.\nIncrease screenshot text size for better OCR.')
                         ]
                     ],
@@ -191,34 +193,25 @@ class DetailistApp():
             ]
         ]
 
-        self.diff_window_key = 'diff_window'
         return diff_window
 
     def get_about_window(self):
-        with open(self.assets_path + 'LICENSES.txt', encoding="utf8") as licenses_file:
-            licenses_text = licenses_file.read()
-
-        # Default font: ("Helvetica", 11)
-        title_font = ("Helvetica", 14)
-        small_font = ("Helvetica", 9)
-        text_width = 60
-
         about_window = [
             [
                 gui.Image(self.detailist_small_icon)
             ],
             [
-                gui.Text('Detailist', font=title_font, p=(0, 0))
+                gui.Text('Detailist', font=self.title_font, p=(0, 0))
             ],
             [
                 gui.Text('ver. ' + self.detailist_app_version,
-                         font=small_font, p=(0, 0))
+                         font=self.small_font, p=(0, 0))
             ],
             [
                 gui.Text(
                     text='Detailist is a simple tool that allows to take screenshots,'
                     ' compare screenshots using heatmap of differences and extract screenshots text (OCR).',
-                    size=(text_width, 2))
+                    size=(self.text_width, 2))
             ],
             [
                 gui.Text('Copyright © 2021 Dima Beskrestnov\nLicensed under the Apache License 2.0',
@@ -231,17 +224,16 @@ class DetailistApp():
                 gui.Text(
                     text='Detailist is a small man standing on the shoulders of giants.\nIt was built using: Python, PySimpleGUI, PyInstaller, Pillow, NumPy, Tesseract, psgtray and keyboard libraries.'
                     '\nLicenses for libraries used are reproduced below:',
-                    size=(text_width, 4))
+                    size=(self.text_width, 4))
             ],
             [
                 gui.Multiline(
                     disabled=True,
-                    size=(text_width, 8),
-                    default_text=licenses_text)
+                    size=(self.text_width, 8),
+                    default_text=self.licenses_text)
             ],
         ]
 
-        self.about_window_key = 'about_window'
         return about_window
 
     def fix_taskbar_icon(self):
@@ -259,13 +251,10 @@ class DetailistApp():
         about_window = self.get_about_window()
         diff_window = self.get_diff_window()
 
-        self.visible_window = self.about_window_key
         layout = [[gui.Column(about_window, element_justification='center', visible=False, key=self.about_window_key),
                    gui.Column(diff_window, visible=False, key=self.diff_window_key)]]
-
-        screen_quarter_w = int(gui.Window.get_screen_size()[0]//4)
         self.window = gui.Window('Detailist', layout, finalize=True, alpha_channel=0,
-                                 enable_close_attempted_event=True, location=(screen_quarter_w, 50))
+                                 enable_close_attempted_event=True, location=(self.screen_quarter_w, 50))
 
         self.window.hide()
 
@@ -277,10 +266,6 @@ class DetailistApp():
         canvas.config(highlightthickness=1)
         canvas.configure(xscrollincrement='1')
         canvas.configure(yscrollincrement='1')
-        # Max screen resolution: 6880, 2880. Aspect ratio: 16:9.
-        # scrollregion must be explicitly defined for canvas.xview() to work.
-        self.max_width = 6880
-        self.max_heigh = 2880
         canvas.configure(scrollregion=(0, 0, self.max_width, self.max_heigh))
         canvas.xview_moveto(0)
         canvas.yview_moveto(0)
@@ -310,11 +295,9 @@ class DetailistApp():
     def init_graphs(self):
         self.graph_1 = self.window.Element(self.graph_1_key)
         self.init_canvas(self.graph_1.tk_canvas)
-        self.is_screenshot_1 = False
 
         self.graph_2 = self.window.Element(self.graph_2_key)
         self.init_canvas(self.graph_2.tk_canvas)
-        self.is_screenshot_2 = False
 
         self.graph_diff = self.window.Element(self.graph_diff_key)
         self.graph_diff.tk_canvas.config(highlightthickness=1)
@@ -337,8 +320,8 @@ class DetailistApp():
                                window=self.window, tooltip='Detailist', icon=self.detailist_icon)
 
     def init_hotkeys(self):
-        kb.add_hotkey('ctrl+print screen', self.create_screenshot)
-        kb.add_hotkey('ctrl+alt+print screen', self.clear_screenshot)
+        add_hotkey('ctrl+print screen', self.create_screenshot)
+        add_hotkey('ctrl+alt+print screen', self.clear_screenshot)
 
     def start(self):
         while True:
@@ -410,7 +393,7 @@ class DetailistApp():
         graph_image.save(tmp_img_path, format='PNG')
 
         image_text = self.get_image_text(tmp_img_path)
-        self.window[self.text_window_key].update(image_text)
+        self.window[self.text_block_key].update(image_text)
 
         self.clean_tmp()
 
@@ -481,9 +464,9 @@ class DetailistApp():
     def auto_center(self):
         if not self.is_screenshot_1 or not self.is_screenshot_2:
             return
-        if self.is_auto_center_in_progress:
+        if self.is_center_in_progress:
             return
-        self.is_auto_center_in_progress = True
+        self.is_center_in_progress = True
 
         screenshot_1 = self.get_element_image(self.graph_1)
         screenshot_2 = self.get_element_image(self.graph_2)
@@ -508,7 +491,7 @@ class DetailistApp():
             x_pos[0] - pos_diff_x / self.max_width)
         self.graph_2.tk_canvas.yview_moveto(
             y_pos[0] - pos_diff_y / self.max_heigh)
-        self.is_auto_center_in_progress = False
+        self.is_center_in_progress = False
 
         # Wait 50 msec for canvas.xview_moveto.
         Timer(0.05, self.calculate_screenshots_diff).start()
@@ -667,9 +650,9 @@ class DetailistApp():
     def calculate_screenshots_diff(self):
         if not self.is_screenshot_1 or not self.is_screenshot_2:
             return
-        if self.is_calculation_in_progress:
+        if self.is_diff_in_progress:
             return
-        self.is_calculation_in_progress = True
+        self.is_diff_in_progress = True
 
         screenshot_1 = self.get_element_image(self.graph_1)
         screenshot_2 = self.get_element_image(self.graph_2)
@@ -681,4 +664,4 @@ class DetailistApp():
         self.graph_diff.erase()
         self.graph_diff.draw_image(
             data=screenshot_data.getvalue(), location=(0, 0))
-        self.is_calculation_in_progress = False
+        self.is_diff_in_progress = False
