@@ -50,8 +50,10 @@ class DetailistApp():
         self.is_center_in_progress = False
 
         self.visible_window = self.about_window_key
-        self.screen_quarter_w = int(gui.Window.get_screen_size()[0]//4)
-        self.screen_one_third_h = int(gui.Window.get_screen_size()[1]//3)
+        screen_w = gui.Window.get_screen_size()[0]
+        screen_h = gui.Window.get_screen_size()[1]
+        self.screen_quarter_w = int(screen_w//4)
+        self.screen_one_third_h = int(screen_h//3)
         self.screenshot_size = (self.screen_one_third_h,
                                 self.screen_one_third_h)
         self.comparison_strenght = 20
@@ -177,7 +179,9 @@ class DetailistApp():
                             gui.Text('Comparison:'),
                             gui.Combo(['Heatmap', 'Opacity', 'Simple Diff'], size=(8, 6), enable_events=True, key=self.comparison_mode_key,
                                       default_value='Heatmap', tooltip='Comparison Mode', readonly=True),
-                            gui.Slider(size=(int(self.screen_one_third_h//18), 20), range=(1, 100), orientation='h', key=self.comparison_strenght_key, enable_events=True, disable_number_display=True,
+                        ],
+                        [
+                            gui.Slider(size=(int(self.screen_one_third_h//9), 20), range=(1, 100), orientation='h', key=self.comparison_strenght_key, enable_events=True, disable_number_display=True,
                                        default_value=self.comparison_strenght, tooltip='Comparison Strenght')
                         ],
                         [
@@ -303,7 +307,7 @@ class DetailistApp():
         self.graph_diff.tk_canvas.config(highlightthickness=1)
 
         if len(self.screenshot_size) >= 2:
-            graph_help_text = 'Press Ctrl + Print Screen to Take a Screenshot\nPress Ctrl + Alt + Print Screen to Clear the last Screenshot'
+            graph_help_text = 'Press Ctrl + Print Screen to\nTake a Screenshot\n\nPress Ctrl + Alt + Print Screen to\nClear the last Screenshot'
             graph_help_location = (self.screenshot_size[0]/2,
                                    self.screenshot_size[1]/2)
             self.graph_1.draw_text(graph_help_text, graph_help_location)
