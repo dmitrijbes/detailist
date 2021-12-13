@@ -53,6 +53,23 @@
 			gtag("js", new Date());
 
 			gtag("config", "G-CBXXS65F8D");
+			gtag("config", "AW-10788961839");
+		</script>
+		<script>
+			function gtag_report_conversion(url) {
+				var callback = function () {
+					if (typeof url != "undefined") {
+						window.location = url;
+					}
+				};
+
+				gtag("event", "conversion", {
+					send_to: "AW-10788961839/hAkCCPW8_4kDEK_8yZgo", //download_page_click
+					event_callback: callback,
+				});
+
+				return false;
+			}
 		</script>
 	</head>
 	<body>
@@ -74,7 +91,9 @@
 				</p>
 				<ul class="downloads">
 					<li>
-						<a href="{{ site.github.releases_url }}"
+						<a
+							onclick="gtag_report_conversion()"
+							href="{{ site.github.releases_url }}"
 							>Download <strong>Release</strong></a
 						>
 					</li>
