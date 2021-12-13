@@ -31,7 +31,7 @@ from PIL import ImageChops as ic
 
 class DetailistApp():
     def __init__(self):
-        self.detailist_app_version = '1.0.0'
+        self.detailist_app_version = '1.0.1'
 
         self.about_window_key = 'about_window'
         self.diff_window_key = 'diff_window'
