@@ -9,6 +9,7 @@ Detailist is a simple tool that allows to take screenshots, compare screenshots 
 2\. Install dependencies:
 ```
 pip install pysimplegui
+pip install pyinstaller
 pip install psgtray
 pip install Pillow
 pip install numpy
